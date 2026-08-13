@@ -63,7 +63,12 @@ dotnet build -p:OwManagedDir="E:\Games\Outer Wilds\OuterWilds_Data\Managed" `
 cd mcp_server
 pip install -e .
 python tools/smoke.py     # works with the game closed
+pytest                    # 23 tests, no game required
 ```
+
+The test fixture is synthetic, built by `tools/make_fixture.py`. It reproduces the
+shapes that trip the parser — notably facts that are `read` but never revealed — without
+publishing anyone's playthrough. Regenerate it with `python tools/make_fixture.py`.
 
 Register with Claude Code:
 
