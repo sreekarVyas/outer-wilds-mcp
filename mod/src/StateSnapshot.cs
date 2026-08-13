@@ -43,6 +43,12 @@ namespace GameContextProvider
             [JsonProperty("id")] public string Id;
             [JsonProperty("name")] public string Name;
             [JsonProperty("distance")] public float Distance;
+
+            /// <summary>Degrees from where the player is looking: 0 ahead, +90 right, -90 left, ±180 behind.</summary>
+            [JsonProperty("bearing")] public float? Bearing;
+
+            /// <summary>Degrees above the local horizon: positive is up, negative is down.</summary>
+            [JsonProperty("elevation")] public float? Elevation;
         }
 
         public sealed class LoopState
@@ -85,6 +91,12 @@ namespace GameContextProvider
 
             /// <summary>Nearest body to this object, which is not necessarily the player's body.</summary>
             [JsonProperty("body")] public string Body;
+
+            /// <summary>Degrees from where the player is looking: 0 ahead, +90 right, -90 left, ±180 behind.</summary>
+            [JsonProperty("bearing")] public float? Bearing;
+
+            /// <summary>Degrees above the local horizon: positive is up, negative is down.</summary>
+            [JsonProperty("elevation")] public float? Elevation;
         }
     }
 }

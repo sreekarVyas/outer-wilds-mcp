@@ -6,6 +6,7 @@ from typing import Any
 
 from gcp.adapters.base import Sourced
 
+from . import direction
 from .resolver import Resolver
 from .save_reader import SaveReader
 from .snapshot_source import SnapshotSource
@@ -116,9 +117,9 @@ class OuterWildsAdapter:
 
         return Sourced(
             data={
-                "ship": snapshot.get("ship"),
-                "probe": snapshot.get("probe"),
-                "note": "only ship and probe are tracked in schema 1",
+                "ship": direction.annotate(snapshot.get("ship")),
+                "probe": direction.annotate(snapshot.get("probe")),
+                "markers": [direction.annotate(e) for e in (snapshot.get("nearby_entries") or [])],
             },
             source="live",
             stale=stale,
@@ -190,7 +191,19 @@ class OuterWildsAdapter:
                 "seconds_remaining": round(loop.get("remaining", 0)),
                 "flowing": loop.get("flowing"),
             }
-            data["ship_distance"] = (snapshot.get("ship") or {}).get("distance")
+            ship = direction.annotate(snapshot.get("ship")) or {}
+            data["ship_distance"] = ship.get("distance")
+            data["ship_direction"] = ship.get("direction")
+
+            # Markers with directions: the answer to "where do I go from here".
+            data["nearby"] = [
+                {
+                    "name": m.get("name"),
+                    "direction": m.get("direction"),
+                }
+                for m in (direction.annotate(e) for e in (snapshot.get("nearby_entries") or []))
+                if m.get("direction")
+            ]
 
         if save is not None:
             data["progression"] = {

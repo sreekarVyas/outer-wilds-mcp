@@ -140,6 +140,12 @@ namespace GameContextProvider
             var playerPos = playerTransform.position;
             var body = FindNearestBody(playerPos);
 
+            // Direction is meaningful only relative to where the player looks and which
+            // way is up, so both are resolved once and shared by every target below.
+            var camera = Locator.GetPlayerCamera();
+            var cameraTransform = camera != null ? camera.transform : null;
+            var up = LocalUp(body, playerPos, cameraTransform);
+
             var snapshot = new StateSnapshot
             {
                 Timestamp = Now(),
@@ -150,9 +156,9 @@ namespace GameContextProvider
                 Hazards = ReadHazards(),
                 Loop = ReadLoop(),
                 Player = ReadPlayer(playerBody, playerPos, body),
-                Ship = Describe(Locator.GetShipTransform(), playerPos),
-                Probe = Describe(ProbeTransform(), playerPos),
-                NearbyEntries = ReadNearbyEntries(playerPos),
+                Ship = Describe(Locator.GetShipTransform(), playerPos, cameraTransform, up),
+                Probe = Describe(ProbeTransform(), playerPos, cameraTransform, up),
+                NearbyEntries = ReadNearbyEntries(playerPos, cameraTransform, up),
             };
 
             return snapshot;
@@ -261,7 +267,7 @@ namespace GameContextProvider
         /// Note: this reports markers regardless of whether the player has discovered
         /// the entry. Filtering by discovery belongs on the consumer side.
         /// </summary>
-        private List<StateSnapshot.EntryInfo> ReadNearbyEntries(Vector3 playerPos)
+        private List<StateSnapshot.EntryInfo> ReadNearbyEntries(Vector3 playerPos, Transform camera, Vector3 up)
         {
             var result = new List<StateSnapshot.EntryInfo>();
             if (EntryLocationsField == null) return result;
@@ -274,14 +280,19 @@ namespace GameContextProvider
                 var location = pair.Value;
                 if (location == null) continue;
 
-                var distance = Vector3.Distance(location.GetPosition(), playerPos);
+                var position = location.GetPosition();
+                var distance = Vector3.Distance(position, playerPos);
                 if (distance > NearbyEntryRadius) continue;
+
+                ComputeDirection(position, playerPos, camera, up, out var bearing, out var elevation);
 
                 result.Add(new StateSnapshot.EntryInfo
                 {
                     Id = pair.Key,
                     Name = location.GetEntryName(false),
                     Distance = distance,
+                    Bearing = bearing,
+                    Elevation = elevation,
                 });
             }
 
@@ -306,6 +317,60 @@ namespace GameContextProvider
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Direction from the player to a world point, as the player experiences it.
+        ///
+        /// "61 metres away" does not help anyone find something. What helps is "to your
+        /// right and below you". Two angles carry that:
+        ///
+        ///   bearing   — degrees around the local up axis from where the camera looks.
+        ///               0 ahead, +90 right, -90 left, ±180 behind.
+        ///   elevation — degrees above the local horizon. Positive up, negative down.
+        ///
+        /// "Up" is away from the centre of the current body, not Unity's world up, because
+        /// on a sphere the player's up changes with every step. Without a body — deep
+        /// space — there is no meaningful horizon, so elevation falls back to the camera's
+        /// own up axis.
+        /// </summary>
+        private static void ComputeDirection(
+            Vector3 target, Vector3 playerPos, Transform camera, Vector3 up,
+            out float? bearing, out float? elevation)
+        {
+            bearing = null;
+            elevation = null;
+
+            if (camera == null) return;
+
+            var toTarget = target - playerPos;
+            if (toTarget.sqrMagnitude < 0.0001f) return;
+
+            var direction = toTarget.normalized;
+
+            // Elevation: how far off the tangent plane the target sits.
+            elevation = Mathf.Asin(Mathf.Clamp(Vector3.Dot(direction, up), -1f, 1f)) * Mathf.Rad2Deg;
+
+            // Bearing: both vectors flattened onto the tangent plane, then a signed angle.
+            var flatTarget = Vector3.ProjectOnPlane(direction, up);
+            var flatForward = Vector3.ProjectOnPlane(camera.forward, up);
+
+            // Looking straight up or down leaves no horizontal component to compare.
+            if (flatTarget.sqrMagnitude < 0.0001f || flatForward.sqrMagnitude < 0.0001f) return;
+
+            bearing = Vector3.SignedAngle(flatForward, flatTarget, up);
+        }
+
+        /// <summary>Local up: away from the body's centre, or the camera's up in deep space.</summary>
+        private static Vector3 LocalUp(AstroObject body, Vector3 playerPos, Transform camera)
+        {
+            if (body != null)
+            {
+                var fromCentre = playerPos - body.transform.position;
+                if (fromCentre.sqrMagnitude > 0.0001f) return fromCentre.normalized;
+            }
+
+            return camera != null ? camera.up : Vector3.up;
         }
 
         /// <summary>Nearest body by centre distance. Good enough: you are normally closest to what you are standing on.</summary>
@@ -346,16 +411,19 @@ namespace GameContextProvider
             return probe != null && probe.IsLaunched() ? probe.transform : null;
         }
 
-        private static StateSnapshot.ObjectInfo Describe(Transform target, Vector3 playerPos)
+        private static StateSnapshot.ObjectInfo Describe(
+            Transform target, Vector3 playerPos, Transform camera, Vector3 up)
         {
             if (target == null) return new StateSnapshot.ObjectInfo();
 
-            var body = FindNearestBody(target.position);
+            ComputeDirection(target.position, playerPos, camera, up, out var bearing, out var elevation);
+
             return new StateSnapshot.ObjectInfo
             {
                 Distance = Vector3.Distance(target.position, playerPos),
-                Body = BodyKey(body),
-
+                Body = BodyKey(FindNearestBody(target.position)),
+                Bearing = bearing,
+                Elevation = elevation,
             };
         }
 
