@@ -1,0 +1,28 @@
+{
+  "_comment": "Display names and geometric fallback regions per celestial body. Keys are AstroObject.Name enum values as emitted by the plugin. 'regions' apply only where no sector matched; lat/lon/radial are in the body's local frame, degrees and metres. Radii below are placeholders — measure them in game via the 'radial' field while standing on the surface.",
+
+  "Sun": { "name": "The Sun" },
+  "TimberHearth": { "name": "Timber Hearth", "surface_radius": 254 },
+  "TimberMoon": { "name": "The Attlerock" },
+  "BrittleHollow": {
+    "name": "Brittle Hollow",
+    "surface_radius": 272,
+    "regions": [
+      { "name": "north pole region", "lat": [55, 90] },
+      { "name": "south pole region", "lat": [-90, -55] }
+    ]
+  },
+  "VolcanicMoon": { "name": "Hollow's Lantern" },
+  "CaveTwin": { "name": "Ember Twin" },
+  "TowerTwin": { "name": "Ash Twin" },
+  "GiantsDeep": { "name": "Giant's Deep" },
+  "DarkBramble": { "name": "Dark Bramble" },
+  "Comet": { "name": "The Interloper" },
+  "QuantumMoon": { "name": "The Quantum Moon" },
+  "WhiteHole": { "name": "The White Hole" },
+  "ProbeCannon": { "name": "Orbital Probe Cannon" },
+  "SunStation": { "name": "The Sun Station" },
+  "RingWorld": { "name": "The Stranger" },
+  "DreamWorld": { "name": "The Dream World" },
+  "Eye": { "name": "The Eye of the Universe" }
+}

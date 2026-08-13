@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>GameContextProvider</AssemblyName>
+    <RootNamespace>GameContextProvider</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Unity assemblies are not strong-name/deterministic friendly; keep it simple. -->
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Core" Version="5.4.21" />
+  </ItemGroup>
+
+  <!--
+    Reference the game's own assemblies rather than NuGet Unity packages: this is
+    compiled against exactly what is installed, so a signature mismatch is impossible.
+    Private=false — never copy these into the output.
+  -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(OwManagedDir)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(OwManagedDir)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(OwManagedDir)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(OwManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(OwManagedDir)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Convenience: dotnet build -p:DeployToGame=true  drops the dll into BepInEx\plugins -->
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true'">
+    <MakeDir Directories="$(OwGameDir)\BepInEx\plugins\GameContextProvider" />
+    <Copy SourceFiles="$(TargetPath)"
+          DestinationFolder="$(OwGameDir)\BepInEx\plugins\GameContextProvider" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) -> $(OwGameDir)\BepInEx\plugins\GameContextProvider" />
+  </Target>
+
+</Project>

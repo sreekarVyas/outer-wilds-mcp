@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    Path to the game's managed assemblies. Override on the command line if the
+    game lives somewhere else:
+      dotnet build -p:OwManagedDir="E:\Games\Outer Wilds\OuterWilds_Data\Managed"
+  -->
+  <PropertyGroup>
+    <OwManagedDir Condition="'$(OwManagedDir)' == ''">D:\Games\Outer Wilds\OuterWilds_Data\Managed</OwManagedDir>
+    <OwGameDir Condition="'$(OwGameDir)' == ''">D:\Games\Outer Wilds</OwGameDir>
+  </PropertyGroup>
+
+  <Target Name="CheckManagedDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(OwManagedDir)\Assembly-CSharp.dll')"
+           Text="Assembly-CSharp.dll not found in '$(OwManagedDir)'. Set OwManagedDir to your Outer Wilds Managed folder." />
+  </Target>
+
+</Project>

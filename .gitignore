@@ -1,0 +1,19 @@
+# Decompiled game code — reference only, never commit (copyrighted)
+refs/
+
+# .NET
+bin/
+obj/
+*.user
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Runtime output
+snapshot.json
+*.log

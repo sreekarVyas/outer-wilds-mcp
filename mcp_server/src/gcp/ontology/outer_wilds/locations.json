@@ -1,0 +1,241 @@
+{
+  "_comment": "Sector key -> place name. Keys come from the plugin: Sector.GetIDString() when set, else the enum name, else the GameObject name (the usual case). The plugin records every sector entered to BepInEx/gcp-sectors-seen.json. This file is hot-reloaded, so no restart and no rebuild is needed. 'confirmed' is true when the name is certain, and false when the name is inferred from the sector id and still needs a check in game.",
+
+  "TimberHearth": {
+    "name": "Timber Hearth",
+    "landmarks": ["the Village", "the Observatory", "the geyser"],
+    "confirmed": true
+  },
+  "Sector_Village": {
+    "name": "the Village",
+    "sub_location": "Timber Hearth",
+    "landmarks": ["Observatory", "launch tower", "Hornfels"],
+    "confirmed": true
+  },
+  "Sector_LowerVillage": {
+    "name": "the Lower Village",
+    "sub_location": "Timber Hearth village, by the water",
+    "landmarks": ["campfire", "the elevator up"],
+    "confirmed": true
+  },
+  "Sector_StartingCamp": {
+    "name": "the starting campfire",
+    "sub_location": "Timber Hearth, Lower Village",
+    "landmarks": ["campfire", "Hornfels", "the path to the launch tower"],
+    "confirmed": true
+  },
+  "Ship": {
+    "name": "your ship",
+    "container": true,
+    "landmarks": ["flight console", "ship log computer", "map"],
+    "confirmed": true
+  },
+
+  "BrittleHollow": {
+    "name": "Brittle Hollow",
+    "landmarks": ["the black hole at the core", "the Hanging City", "the crust fragments"],
+    "hazards": ["the crust falls into the black hole through the loop"],
+    "confirmed": true
+  },
+  "Sector_NorthHemisphere": {
+    "name": "the northern hemisphere of Brittle Hollow",
+    "broad": true,
+    "confirmed": true
+  },
+  "Sector_SouthHemisphere": {
+    "name": "the southern hemisphere of Brittle Hollow",
+    "broad": true,
+    "confirmed": true
+  },
+
+  "Sector_HangingCity": {
+    "name": "the Hanging City",
+    "sub_location": "Brittle Hollow, hanging beneath the northern crust",
+    "landmarks": ["Black Hole Forge", "the districts", "the black hole below"],
+    "hazards": ["the black hole below the city"],
+    "confirmed": true
+  },
+  "Sector_HangingCity_Entrance": {
+    "name": "the entrance to the Hanging City",
+    "sub_location": "Brittle Hollow",
+    "confirmed": true
+  },
+  "Sector_HangingCity_District1": {
+    "name": "the Hanging City, first district",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["the black hole below the city"],
+    "confirmed": true
+  },
+  "Sector_HangingCity_District2": {
+    "name": "the Hanging City, second district",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["the black hole below the city"],
+    "confirmed": true
+  },
+  "Sector_SecretEntrance": {
+    "name": "the secret entrance",
+    "sub_location": "Brittle Hollow, near the Black Hole Forge",
+    "confirmed": false
+  },
+  "Sector Main Bridge": {
+    "name": "the main bridge",
+    "sub_location": "Brittle Hollow, Hanging City",
+    "confirmed": false
+  },
+  "Fragment B2_MainBridge": {
+    "name": "the crust fragment holding the main bridge",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Sector_MigrationPathCity": {
+    "name": "the migration path near the Hanging City",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Sector Northern Trident": {
+    "name": "the Northern Trident",
+    "sub_location": "Brittle Hollow, northern hemisphere",
+    "confirmed": false
+  },
+  "Sector_NorthPole": {
+    "name": "the north pole",
+    "sub_location": "Brittle Hollow",
+    "broad": true,
+    "confirmed": false
+  },
+  "Sector_NorthPoleSurface": {
+    "name": "the north pole surface",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Fragment 9_NorthernGravcanonia": {
+    "name": "a crust fragment near the northern gravity cannon",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Fragment 10_NorthernGravcanonia": {
+    "name": "a crust fragment near the northern gravity cannon",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Fragment 33_NorthernGravcanonia": {
+    "name": "a crust fragment near the northern gravity cannon",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Sector_OldSettlement": {
+    "name": "the Old Settlement",
+    "sub_location": "Brittle Hollow, northern hemisphere",
+    "landmarks": ["gravity cannon", "Nomai text", "the fragment that has broken away"],
+    "confirmed": false
+  },
+  "Fragment OldSettlement 5": {
+    "name": "a broken fragment of the Old Settlement",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Sector_CannonEscapePodPath": {
+    "name": "the path between the gravity cannon and the escape pod",
+    "sub_location": "Brittle Hollow, Old Settlement",
+    "confirmed": false
+  },
+  "Sector_EscapePodCrashSite": {
+    "name": "the Escape Pod crash site",
+    "sub_location": "Brittle Hollow",
+    "landmarks": ["the crashed Nomai escape pod", "the log of the survivors"],
+    "confirmed": false
+  },
+  "Sector Northern Gravcanonia": {
+    "name": "the area around the northern gravity cannon",
+    "sub_location": "Brittle Hollow, northern hemisphere",
+    "confirmed": false
+  },
+  "Sector Quantum Pole Path": {
+    "name": "the path to the north pole quantum shard",
+    "sub_location": "Brittle Hollow, north pole",
+    "landmarks": ["the quantum shard"],
+    "confirmed": false
+  },
+  "Sector Migration Path": {
+    "name": "the Nomai migration path",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Sector_NorthFragment": {
+    "name": "a northern crust fragment",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Sector_SouthFragment": {
+    "name": "a southern crust fragment",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Sector_CrashFragment": {
+    "name": "the crust fragment holding the crash site",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+
+  "Sector_GravityCannon": {
+    "name": "the Gravity Cannon",
+    "sub_location": "Brittle Hollow, Old Settlement",
+    "landmarks": ["the launch platform", "Nomai text"],
+    "confirmed": false
+  },
+  "Fragment 57_NorthernGravcanonia": {
+    "name": "the crust fragment holding the northern gravity cannon",
+    "sub_location": "Brittle Hollow",
+    "hazards": ["this fragment can fall into the black hole"],
+    "confirmed": false
+  },
+  "Sector Cannon Path": {
+    "name": "the approach to the gravity cannon",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Sector Cannon Pole Path": {
+    "name": "the path between the gravity cannon and the pole",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Sector_RadioTower": {
+    "name": "the radio tower",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Sector_SouthPole": {
+    "name": "the south pole",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+  "Sector Great Southern Triangle": {
+    "name": "the Great Southern Triangle",
+    "sub_location": "Brittle Hollow, southern hemisphere",
+    "confirmed": false
+  },
+  "Sector Crossroad Quantum Path": {
+    "name": "the path from the crossroads to the quantum shard",
+    "sub_location": "Brittle Hollow",
+    "confirmed": false
+  },
+
+  "WhiteHole": {
+    "name": "the White Hole",
+    "confirmed": true
+  },
+  "Sector_WhiteholeStation": {
+    "name": "the White Hole Station",
+    "sub_location": "the Nomai warp station beside the white hole",
+    "landmarks": ["warp pad", "Nomai text wall", "the white hole"],
+    "confirmed": true
+  }
+}
