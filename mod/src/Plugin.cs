@@ -51,6 +51,8 @@ namespace GameContextProvider
             collector.OnSnapshot = _writer.Publish;
             collector.LogWarning = m => Logger.LogWarning(m);
             collector.Discoveries = _discoveries;
+            collector.ShipLogDumpPath = Path.Combine(
+                Path.GetDirectoryName(_outputPath.Value) ?? ".", "gcp-shiplog.json");
 
             foreach (var problem in StateCollector.SelfCheck())
             {

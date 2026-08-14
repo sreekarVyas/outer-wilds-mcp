@@ -9,6 +9,7 @@ from gcp.adapters.base import Sourced
 from . import direction
 from .resolver import Resolver
 from .save_reader import SaveReader
+from .shiplog_text import ShipLogText
 from .snapshot_source import SnapshotSource
 
 PROCESS_NAME = "OuterWilds"
@@ -35,6 +36,7 @@ class OuterWildsAdapter:
         self.snapshots = SnapshotSource()
         self.saves = SaveReader()
         self.resolver = Resolver()
+        self.text = ShipLogText()
 
     # --- source handling -------------------------------------------------
 
@@ -145,17 +147,26 @@ class OuterWildsAdapter:
         if save is None:
             return self._unavailable(["no Outer Wilds save file found"])
 
-        facts = save.revealed_facts if spoiler_level == "player_known" else list(save.facts)
+        # "full" returns every fact in the game; "player_known" returns only what the
+        # player has discovered. Full is the default by the project owner's choice.
+        facts = list(save.facts) if spoiler_level == "full" else save.revealed_facts
+
+        data: dict[str, Any] = {
+            "spoiler_level": spoiler_level,
+            "count": len(facts),
+        }
+
+        if self.text.available:
+            data["entries"] = self.text.group_by_entry(facts)
+        else:
+            data["fact_ids"] = facts
+
         return Sourced(
-            data={
-                "spoiler_level": spoiler_level,
-                "fact_ids": facts,
-                "count": len(facts),
-                "note": "fact ids only; run the ship log dump to attach readable text",
-            },
+            data=data,
             source="save_file",
             stale=True,
             age_seconds=save.age_seconds,
+            warnings=self.text.warnings,
         )
 
     def get_current_context(self, spoiler_level: str = "full") -> Sourced:
