@@ -22,6 +22,11 @@ namespace GameContextProvider
         /// <summary>Optional. Records every sector ever entered, so nothing is lost between reads.</summary>
         public DiscoveryLog Discoveries;
 
+        /// <summary>Where to write the one-shot ship log dump. Null disables it.</summary>
+        public string ShipLogDumpPath;
+
+        private bool _shipLogDumped;
+
         private float _nextSampleTime;
 
         // Every AstroObject.Name that Locator can actually resolve. Locator.GetAstroObject
@@ -114,6 +119,14 @@ namespace GameContextProvider
             {
                 Discoveries.Observe(snapshot.Sectors, snapshot.Body);
                 Discoveries.FlushIfDirty();
+            }
+
+            // The ship log is only populated once a save is loaded, so this cannot run at
+            // startup. Retry each sample until it succeeds, then never again.
+            if (!_shipLogDumped && snapshot.InGame && ShipLogDumpPath != null)
+            {
+                _shipLogDumped = ShipLogDumper.TryDump(
+                    Locator.GetShipLogManager(), ShipLogDumpPath, LogWarning);
             }
 
             OnSnapshot?.Invoke(snapshot);
