@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "MCP server exposing live, semantically-resolved game context to an AI assistant"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.2.0",
+    # 2.0 removed FastMCP in favour of MCPServer; server.py targets the 2.x API.
+    "mcp>=2.0,<3",
 ]
 
 [project.optional-dependencies]
@@ -12,12 +13,16 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 gcp-server = "gcp.server:main"
+gcp-doctor = "gcp.doctor:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
+# Everything under src/gcp ships, including gcp/ontology/**/*.json — the resolver
+# needs that data at runtime, and hatch includes non-Python files in a package by
+# default. Verified by inspecting the built wheel; see tests/test_packaging.py.
 packages = ["src/gcp"]
 
 [tool.pytest.ini_options]

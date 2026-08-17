@@ -11,14 +11,11 @@ player has not revealed — filtering by discovery happens here, at the boundary
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-DEFAULT_DUMP_PATH = Path(
-    os.environ.get("GCP_SHIPLOG_PATH", r"D:\Games\Outer Wilds\BepInEx\gcp-shiplog.json")
-)
+from gcp import config
 
 SUPPORTED_SCHEMA = 1
 
@@ -38,7 +35,8 @@ class ShipLogText:
     """Fact id and entry id lookups, loaded once and refreshed if the dump changes."""
 
     def __init__(self, path: Path | None = None) -> None:
-        self.path = path or DEFAULT_DUMP_PATH
+        self.resolved = config.shiplog_path(path)
+        self.path = self.resolved.value
         self._facts: dict[str, FactText] = {}
         self._entries: dict[str, str] = {}
         self._mtime: float = -1.0

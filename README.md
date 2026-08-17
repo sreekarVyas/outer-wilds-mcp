@@ -29,60 +29,94 @@ back to the save file when the game is not running.
 
 ## Status
 
-- [x] Decompiled reference (`refs/`, 1,706 files)
-- [x] Save reader — verified against a real save
-- [x] MCP server, tools, adapter, resolver
-- [x] Plugin builds clean against the installed game DLLs
-- [ ] **BepInEx not yet installed — the live path is untested**
-- [ ] Ontology is two seed entries; needs authoring by playing
-- [ ] Ship log fact text (ids only for now)
+- [x] Save reader, resolver, adapter — 75 tests
+- [x] Plugin verified live against Outer Wilds 1.1.10.47
+- [x] Ship log text: 89 entries, 371 facts
+- [x] MCP server verified over stdio, all 8 tools
+- [x] Zero-config paths — game auto-detected, `gcp-doctor` for when it is not
+- [ ] Ontology is 42 sectors, 14 confirmed and 28 inferred from sector ids
+- [ ] Untested against 1.1.15.x, the version most players run
+- [ ] No prebuilt release — installing needs the .NET SDK
 
 ## Setup
 
-### Plugin
+No paths to configure. The build finds the game itself, and the plugin and the server
+agree on a data directory without either having to locate the other.
 
-BepInEx 5.4.x (x64) must be installed into `D:\Games\Outer Wilds` first. Launch the
-game once and confirm `BepInEx\LogOutput.log` appears before going further — doorstop
-injection into this install is unverified.
+### 1. Plugin
+
+Install [BepInEx 5.4.x (x64)](https://github.com/BepInEx/BepInEx/releases) into your
+Outer Wilds folder, launch the game once, and confirm `BepInEx/LogOutput.log` appears.
 
 ```powershell
 cd mod
 dotnet build -c Release -p:DeployToGame=true
 ```
 
-Override the game path if it moves:
+The build locates the game automatically — it reads the install path out of Unity's
+`Player.log`, which works for Steam, Epic, GOG, and any other install, then falls back
+to the Steam library. Override it only if that fails:
 
 ```powershell
-dotnet build -p:OwManagedDir="E:\Games\Outer Wilds\OuterWilds_Data\Managed" `
-             -p:OwGameDir="E:\Games\Outer Wilds"
+dotnet build -p:OwManagedDir="E:\Games\Outer Wilds\OuterWilds_Data\Managed"
 ```
 
-### Server
+### 2. Server
 
 ```powershell
 cd mcp_server
-pip install -e .
-python tools/smoke.py     # works with the game closed
-pytest                    # 23 tests, no game required
+pip install .
+gcp-doctor                # checks every path and says how to fix what is missing
 ```
 
-The test fixture is synthetic, built by `tools/make_fixture.py`. It reproduces the
-shapes that trip the parser — notably facts that are `read` but never revealed — without
-publishing anyone's playthrough. Regenerate it with `python tools/make_fixture.py`.
-
-Register with Claude Code:
+Register with Claude Code — no `PYTHONPATH`, the package installs a console script:
 
 ```json
 {
   "mcpServers": {
-    "game-context": {
-      "command": "python",
-      "args": ["-m", "gcp.server"],
-      "env": { "PYTHONPATH": "c:/Users/kurud/Documents/Code/game-context-provider/mcp_server/src" }
-    }
+    "game-context": { "command": "gcp-server" }
   }
 }
 ```
+
+### 3. Check it
+
+```powershell
+python tools/check_mcp.py   # starts the server over stdio and calls every tool
+pytest                      # 75 tests, no game required
+```
+
+## Configuration
+
+Nothing is required. When a default is wrong, precedence is:
+
+```
+explicit argument  >  environment variable  >  config file  >  auto-detect  >  OS default
+```
+
+Config file at `%APPDATA%\GameContextProvider\config.toml`:
+
+```toml
+game_dir      = "E:/Games/Outer Wilds"
+data_dir      = "E:/gcp-data"
+snapshot_path = "..."
+save_path     = "..."
+```
+
+Environment variables: `GCP_GAME_DIR`, `GCP_DATA_DIR`, `GCP_SNAPSHOT_PATH`,
+`GCP_SHIPLOG_PATH`, `GCP_SECTORS_PATH`, `GCP_SAVE_PATH`.
+
+Run `gcp-doctor` to see which source won for each path.
+
+### Where files live
+
+| File | Path |
+|---|---|
+| snapshot, ship log, sectors | `%LOCALAPPDATA%\GameContextProvider\outer-wilds\` |
+| save | `%USERPROFILE%\AppData\LocalLow\Mobius Digital\Outer Wilds\*Saves\` |
+
+The plugin writes to the per-user data directory rather than the game folder, so the
+server derives the same path from the OS and never has to find the install.
 
 ## Authoring the ontology
 

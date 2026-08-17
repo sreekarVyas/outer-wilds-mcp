@@ -16,7 +16,7 @@ namespace GameContextProvider
         public const string PluginName = "GameContextProvider";
         public const string PluginVersion = "0.1.0";
 
-        private ConfigEntry<string> _outputPath;
+        private ConfigEntry<string> _dataDirectory;
         private ConfigEntry<float> _sampleInterval;
 
         private SnapshotWriter _writer;
@@ -25,16 +25,21 @@ namespace GameContextProvider
 
         private void Awake()
         {
-            _outputPath = Config.Bind(
-                "Output", "Path",
-                Path.Combine(Paths.BepInExRootPath, "gcp-snapshot.json"),
-                "Where the state snapshot is written. The MCP server reads this file.");
+            // Default to the per-user data directory, not the game folder: the MCP server
+            // derives this same path from the OS, so it never has to locate the install.
+            _dataDirectory = Config.Bind(
+                "Output", "DataDirectory",
+                AppPaths.DataDirectory,
+                "Directory for snapshot, ship log, and sector files. The MCP server reads "
+                + "these. Leave as-is unless you also set GCP_DATA_DIR for the server.");
 
             _sampleInterval = Config.Bind(
                 "Output", "SampleInterval", 0.1f,
                 "Seconds between samples. 0.1 = 10 Hz.");
 
-            _writer = new SnapshotWriter(_outputPath.Value, m => Logger.LogWarning(m));
+            var directory = _dataDirectory.Value;
+            _writer = new SnapshotWriter(
+                Path.Combine(directory, AppPaths.SnapshotFile), m => Logger.LogWarning(m));
 
             // A DontDestroyOnLoad host keeps the collector alive across scene loads —
             // otherwise it dies on every trip to the menu or the Eye.
@@ -43,23 +48,21 @@ namespace GameContextProvider
             _host.hideFlags = HideFlags.HideAndDontSave;
 
             _discoveries = new DiscoveryLog(
-                Path.Combine(Path.GetDirectoryName(_outputPath.Value) ?? ".", "gcp-sectors-seen.json"),
-                m => Logger.LogWarning(m));
+                Path.Combine(directory, AppPaths.SectorsFile), m => Logger.LogWarning(m));
 
             var collector = _host.AddComponent<StateCollector>();
             collector.SampleInterval = _sampleInterval.Value;
             collector.OnSnapshot = _writer.Publish;
             collector.LogWarning = m => Logger.LogWarning(m);
             collector.Discoveries = _discoveries;
-            collector.ShipLogDumpPath = Path.Combine(
-                Path.GetDirectoryName(_outputPath.Value) ?? ".", "gcp-shiplog.json");
+            collector.ShipLogDumpPath = Path.Combine(directory, AppPaths.ShipLogFile);
 
             foreach (var problem in StateCollector.SelfCheck())
             {
                 Logger.LogError("SELF-CHECK FAILED: " + problem);
             }
 
-            Logger.LogInfo($"{PluginName} {PluginVersion} running. Snapshot -> {_outputPath.Value}");
+            Logger.LogInfo($"{PluginName} {PluginVersion} running. Data -> {directory}");
         }
 
         private void OnDestroy()

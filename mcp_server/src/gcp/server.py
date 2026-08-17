@@ -9,12 +9,14 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from gcp.adapters.base import GameAdapter
 from gcp.adapters.outer_wilds.adapter import OuterWildsAdapter
 
-mcp = FastMCP("game-context-provider")
+# MCP SDK 2.x. FastMCP was removed in 2.0; MCPServer is its replacement and keeps the
+# same .tool() decorator and stdio-by-default .run().
+mcp = MCPServer("game-context-provider")
 
 adapter: GameAdapter = OuterWildsAdapter()
 
@@ -69,6 +71,16 @@ def get_connection_status() -> str:
     """Which data sources are reachable and how fresh they are. Check this when
     the context looks wrong or empty."""
     return _json(adapter.get_connection_status())
+
+
+@mcp.tool()
+def diagnose() -> str:
+    """Every path the server resolved, how it was resolved, and how to fix what is
+    missing. Call this when a tool reports no data — the cause is usually a path,
+    and 'game not running' points at the wrong problem."""
+    from gcp import doctor
+
+    return json.dumps(doctor.run().to_dict(), indent=2)
 
 
 def main() -> None:
