@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "outer-wilds": {
+      "command": "gcp-server",
+      "args": []
+    }
+  }
+}
