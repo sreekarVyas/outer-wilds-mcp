@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from gcp import voice
 from gcp.adapters.base import Sourced
 
 from . import direction
@@ -129,37 +130,63 @@ class OuterWildsAdapter:
             warnings=warnings,
         )
 
-    def get_progression(self) -> Sourced:
+    def get_progression(self, include_internals: bool = False) -> Sourced:
+        """How far along the player is — deliberately vague.
+
+        A percentage is a spoiler in both directions: it reveals the size of the game,
+        and "you are 64% done" flattens a story about discovery into a progress bar.
+        The internal summary is still available for debugging.
+        """
         save = self.saves.get()
         if save is None:
-            return self._unavailable(["no Outer Wilds save file found"])
+            return self._unavailable(["no save file found"])
+
+        if include_internals:
+            data = save.summary()
+        else:
+            data = {
+                "note": (
+                    "Progress is deliberately not reported as a number. Ask about what "
+                    "the player has found instead."
+                ),
+            }
 
         return Sourced(
-            data=save.summary(),
+            data=data,
             source="save_file",
             stale=True,  # always: the save is only written at loop end and on quit
             age_seconds=save.age_seconds,
-            warnings=["save data reflects the last write, not the current moment"],
+            warnings=["saved progress reflects the last write, not this moment"],
         )
 
-    def get_player_known_context(self, spoiler_level: str = "full") -> Sourced:
+    def get_player_known_context(self, spoiler_level: str = "player_known",
+                                 include_internals: bool = False) -> Sourced:
         save = self.saves.get()
         if save is None:
             return self._unavailable(["no Outer Wilds save file found"])
 
-        # "full" returns every fact in the game; "player_known" returns only what the
-        # player has discovered. Full is the default by the project owner's choice.
+        # Defaults to what the player has actually found. "full" exposes the whole log
+        # including undiscovered entries, and exists for debugging, not for play.
         facts = list(save.facts) if spoiler_level == "full" else save.revealed_facts
 
-        data: dict[str, Any] = {
-            "spoiler_level": spoiler_level,
-            "count": len(facts),
-        }
+        data: dict[str, Any] = {"spoiler_level": spoiler_level, "count": len(facts)}
 
         if self.text.available:
+            # Grouped under entry names and carrying the game's own wording — this is
+            # what the player would read in their own ship log, nothing more.
             data["entries"] = self.text.group_by_entry(facts)
-        else:
+        elif include_internals:
             data["fact_ids"] = facts
+        else:
+            # Bare ids are meaningless to a player and pure machine talk. Say what is
+            # missing instead of dumping 371 identifiers.
+            data["note"] = (
+                "The written notes are not available yet. Start the game and load your "
+                "save once, and they will be."
+            )
+
+        if not include_internals:
+            data = voice.strip_internals(data)
 
         return Sourced(
             data=data,
@@ -169,8 +196,15 @@ class OuterWildsAdapter:
             warnings=self.text.warnings,
         )
 
-    def get_current_context(self, spoiler_level: str = "full") -> Sourced:
-        """The composed answer — the tool the assistant should normally call."""
+    def get_current_context(self, spoiler_level: str = "player_known",
+                            include_internals: bool = False) -> Sourced:
+        """The composed answer — the tool the assistant should normally call.
+
+        Player-facing by default: no counts, no ids, no save flags. Those are stripped
+        rather than merely discouraged, because an assistant repeats whatever it is
+        given, and "239 of 371 facts" tells the player how big the game is in the
+        vocabulary of a save file.
+        """
         snapshot, warnings, stale, age = self._live()
         save = self.saves.get()
 
@@ -178,7 +212,7 @@ class OuterWildsAdapter:
 
         if snapshot is None or not snapshot.get("in_game"):
             data["live"] = False
-            data["note"] = "game not running, or not in a playable scene"
+            data["note"] = "the game is not running, or you are not in the world yet"
         else:
             player = snapshot.get("player") or {}
             loop = snapshot.get("loop") or {}
@@ -197,6 +231,7 @@ class OuterWildsAdapter:
                 data["position_hint"] = location.get("hint")
 
             data["player_state"] = _describe_player(player)
+            data["time_left"] = voice.time_left(loop.get("remaining"))
             data["loop"] = {
                 "count": loop.get("count"),
                 "seconds_remaining": round(loop.get("remaining", 0)),
@@ -207,20 +242,23 @@ class OuterWildsAdapter:
             data["ship_direction"] = ship.get("direction")
 
             # Markers with directions: the answer to "where do I go from here".
+            #
+            # These carry the game's own name for a place, which is exactly why they
+            # have to be filtered: a marker exists for every location in the game,
+            # discovered or not. Naming an undiscovered one is a spoiler delivered by
+            # the tool itself, which no instruction to the assistant can undo.
+            markers = [direction.annotate(e) for e in (snapshot.get("nearby_entries") or [])]
+            if spoiler_level != "full":
+                known = self._known_entry_ids(save)
+                markers = [m for m in markers if m.get("id") in known]
+
             data["nearby"] = [
-                {
-                    "name": m.get("name"),
-                    "direction": m.get("direction"),
-                }
-                for m in (direction.annotate(e) for e in (snapshot.get("nearby_entries") or []))
-                if m.get("direction")
+                {"name": m.get("name"), "direction": m.get("direction")}
+                for m in markers if m.get("direction")
             ]
 
-        if save is not None:
-            data["progression"] = {
-                "loop_count": save.loop_count,
-                "facts_revealed": len(save.revealed_facts),
-            }
+        if not include_internals:
+            data = voice.strip_internals(data)
 
         return Sourced(
             data=data,
@@ -229,6 +267,23 @@ class OuterWildsAdapter:
             age_seconds=age,
             warnings=warnings,
         )
+
+    def _known_entry_ids(self, save) -> set[str]:
+        """Ship log entries the player has found at least one fact for.
+
+        Entry ids are not in the save, only fact ids — so this maps facts back to their
+        entry through the dump. With no dump available, nothing can be shown to be known,
+        and the safe answer is to show nothing rather than everything.
+        """
+        if save is None or not self.text.available:
+            return set()
+
+        known: set[str] = set()
+        for fact_id in save.revealed_facts:
+            fact = self.text.fact(fact_id)
+            if fact is not None:
+                known.add(fact.entry_id)
+        return known
 
     def get_connection_status(self) -> Sourced:
         snapshot, warnings, stale, age = self._live()
