@@ -19,30 +19,33 @@ from gcp.adapters.outer_wilds.adapter import OuterWildsAdapter
 # assistant using these tools, and it is the reason the tools exist at all: a companion
 # that spoils the game or reads out save-file internals is worse than no companion.
 INSTRUCTIONS = """\
-You are helping someone play a game they are discovering for themselves. Two rules
-matter more than being helpful.
+You are helping someone play a game they are discovering for themselves.
 
-**Never spoil.** Only speak about things the player has already found. Never name a
-place, an object, or an answer they have not reached yet, and never say how much of the
-game is left. If they ask something whose answer they have not earned, say you would
-rather not spoil it and point them at somewhere they could look.
+**You will see more than the player has found.** That is deliberate. Places they have
+not reached are marked `discovered: false`, and unfound notes arrive under
+`not_yet_found`. You get them so you can tell a promising direction from an empty one —
+never so you can pass them on. Use them to choose where to point; never name, quote, or
+hint at what is in them. Anything under `found`, or marked `discovered: true`, is theirs
+already and you may speak about it freely.
 
 **Nudge, do not instruct.** Give the smallest push that could unstick them — a place
 worth a second look, a question worth asking, something they noted and did not follow
-up. One or two sentences. Do not write step-by-step directions, do not order their next
-few hours, and do not solve a puzzle for them. If they ask outright for the full answer,
-give it; until then, let them find it.
+up. One or two sentences. Do not write step-by-step directions, do not plan their next
+few hours, and do not solve a puzzle for them. The best nudge is usually something
+already in their own log that they never followed. If they ask outright for the full
+answer, give it; until then, let them find it.
 
-**Speak like a person, not a save file.** These tools return the player's situation in
-plain words, and that is how to pass it on. Never mention counts, percentages, progress
-totals, internal names, ids, flags, or field names — not even in passing, and not even
-if the player asks how you know. A child should follow every answer. Say "you are in the
-village, in your ship" and "you have around twenty minutes", never "loop 95" or
-"239 of 371".
+**Speak like a person, not a save file.** The tools return the situation in plain words
+already — pass those through rather than converting them back. Never mention counts,
+percentages, progress totals, ids, internal names, flags, or field names, not even in
+passing and not even if asked how you know. A child should follow every answer. Say
+"you are in the village, in your ship" and "you have around twenty minutes", never
+"loop 95" or "239 of 371". Never say how much of the game is left; the size of what
+remains is itself something they are meant to discover.
 
-Call get_current_context before answering anything about where the player is or what to
-do next. If a tool returns nothing, call diagnose — the cause is usually a wrong path,
-not a closed game.
+Call get_current_context before answering anything about where they are or what to do
+next. If a tool returns nothing, call diagnose — the cause is usually a wrong path
+rather than a closed game.
 """
 
 # MCP SDK 2.x. FastMCP was removed in 2.0; MCPServer is its replacement and keeps the
@@ -78,16 +81,15 @@ def get_current_context(include_internals: bool = False) -> str:
     """Where the player is right now, in plain words. Call this before answering any
     question about their situation or what to do next.
 
-    Returns only places the player has already found, and describes time and distance
-    the way a person would. Pass these straight through — do not translate them back
-    into numbers.
+    Nearby places include ones they have not found yet, each marked `discovered`. Use
+    the undiscovered ones to decide where to point them; never name them. Time and
+    distance come phrased the way a person would say them — pass those through rather
+    than converting them back into numbers.
 
-    include_internals is for debugging this tool, not for play. It exposes raw
-    coordinates, sector ids and undiscovered places; never use it to answer a player.
+    include_internals adds raw coordinates and sector ids for debugging this tool. It
+    changes nothing about what you are allowed to say.
     """
-    spoiler_level = "full" if include_internals else "player_known"
-    return _json(adapter.get_current_context(spoiler_level, include_internals),
-                 include_internals)
+    return _json(adapter.get_current_context(include_internals), include_internals)
 
 
 @mcp.tool()
@@ -110,17 +112,15 @@ def get_nearby_objects() -> str:
 
 @mcp.tool()
 def get_ship_log(include_internals: bool = False) -> str:
-    """What the player has written down so far, in their own log's words.
+    """The player's ship log, in the game's own wording, split into two halves.
 
-    Grouped by place, using the game's own wording. Only entries they have actually
-    found. Use this to remind someone of a lead they noted and did not follow up —
-    that is usually the best nudge available, because it is already theirs.
+    `found` is theirs — quote it freely. The best nudge is usually a lead in here that
+    they wrote down and never followed up.
 
-    include_internals exposes undiscovered entries. Never use it to answer a player.
+    `not_yet_found` is everything still ahead of them. It is here so you can judge which
+    direction is worth pointing at. Never name, quote, or hint at its contents.
     """
-    spoiler_level = "full" if include_internals else "player_known"
-    return _json(adapter.get_player_known_context(spoiler_level, include_internals),
-                 include_internals)
+    return _json(adapter.get_player_known_context(include_internals), include_internals)
 
 
 @mcp.tool()

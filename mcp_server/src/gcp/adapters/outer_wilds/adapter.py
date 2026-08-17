@@ -159,31 +159,38 @@ class OuterWildsAdapter:
             warnings=["saved progress reflects the last write, not this moment"],
         )
 
-    def get_player_known_context(self, spoiler_level: str = "player_known",
-                                 include_internals: bool = False) -> Sourced:
+    def get_player_known_context(self, include_internals: bool = False) -> Sourced:
         save = self.saves.get()
         if save is None:
             return self._unavailable(["no Outer Wilds save file found"])
 
-        # Defaults to what the player has actually found. "full" exposes the whole log
-        # including undiscovered entries, and exists for debugging, not for play.
-        facts = list(save.facts) if spoiler_level == "full" else save.revealed_facts
-
-        data: dict[str, Any] = {"spoiler_level": spoiler_level, "count": len(facts)}
-
-        if self.text.available:
-            # Grouped under entry names and carrying the game's own wording — this is
-            # what the player would read in their own ship log, nothing more.
-            data["entries"] = self.text.group_by_entry(facts)
-        elif include_internals:
-            data["fact_ids"] = facts
-        else:
-            # Bare ids are meaningless to a player and pure machine talk. Say what is
-            # missing instead of dumping 371 identifiers.
-            data["note"] = (
-                "The written notes are not available yet. Start the game and load your "
-                "save once, and they will be."
+        if not self.text.available:
+            return Sourced(
+                data={"note": (
+                    "The written notes are not available yet. Start the game and load "
+                    "your save once, and they will be."
+                )},
+                source="save_file",
+                stale=True,
+                age_seconds=save.age_seconds,
+                warnings=self.text.warnings,
             )
+
+        found = set(save.revealed_facts)
+        unfound = [fid for fid in save.facts if fid not in found]
+
+        # Both halves, kept apart. The assistant needs the second to aim a nudge and
+        # must never quote from it — separating them makes that distinction impossible
+        # to lose, in a way a single mixed list would not.
+        data: dict[str, Any] = {
+            "found": self.text.group_by_entry(sorted(found)),
+            "not_yet_found": self.text.group_by_entry(unfound),
+            "how_to_use": (
+                "'found' is the player's own log and may be quoted freely. "
+                "'not_yet_found' is for choosing which direction to point them in. "
+                "Never name, quote, or hint at its contents."
+            ),
+        }
 
         if not include_internals:
             data = voice.strip_internals(data)
@@ -196,14 +203,19 @@ class OuterWildsAdapter:
             warnings=self.text.warnings,
         )
 
-    def get_current_context(self, spoiler_level: str = "player_known",
-                            include_internals: bool = False) -> Sourced:
+    def get_current_context(self, include_internals: bool = False) -> Sourced:
         """The composed answer — the tool the assistant should normally call.
 
-        Player-facing by default: no counts, no ids, no save flags. Those are stripped
-        rather than merely discouraged, because an assistant repeats whatever it is
-        given, and "239 of 371 facts" tells the player how big the game is in the
-        vocabulary of a save file.
+        Two separate concerns, deliberately not conflated:
+
+        **Knowledge** is not withheld. The assistant sees the whole world, including
+        places the player has not found, each marked with `discovered`. Withholding it
+        would leave the assistant unable to tell a real lead from an empty direction.
+
+        **Vocabulary** is enforced here rather than requested. Counts, ids, save flags
+        and raw coordinates are stripped, because an assistant repeats whatever it is
+        given, and "239 of 371 facts" tells the player how large the game is in the
+        vocabulary of a save file. The phrased forms carry the same meaning.
         """
         snapshot, warnings, stale, age = self._live()
         save = self.saves.get()
@@ -243,18 +255,22 @@ class OuterWildsAdapter:
 
             # Markers with directions: the answer to "where do I go from here".
             #
-            # These carry the game's own name for a place, which is exactly why they
-            # have to be filtered: a marker exists for every location in the game,
-            # discovered or not. Naming an undiscovered one is a spoiler delivered by
-            # the tool itself, which no instruction to the assistant can undo.
-            markers = [direction.annotate(e) for e in (snapshot.get("nearby_entries") or [])]
-            if spoiler_level != "full":
-                known = self._known_entry_ids(save)
-                markers = [m for m in markers if m.get("id") in known]
-
+            # A marker exists for every location in the game, discovered or not. All of
+            # them are reported, because an assistant that cannot see an undiscovered
+            # lead cannot tell a promising direction from an empty one — it can only
+            # recycle notes the player already has.
+            #
+            # `discovered` is what makes that safe: it marks which names may be spoken
+            # aloud. An undiscovered entry is for aiming the nudge, never for naming.
+            known = self._known_entry_ids(save)
             data["nearby"] = [
-                {"name": m.get("name"), "direction": m.get("direction")}
-                for m in markers if m.get("direction")
+                {
+                    "name": m.get("name"),
+                    "direction": m.get("direction"),
+                    "discovered": m.get("id") in known,
+                }
+                for m in (direction.annotate(e) for e in (snapshot.get("nearby_entries") or []))
+                if m.get("direction")
             ]
 
         if not include_internals:
