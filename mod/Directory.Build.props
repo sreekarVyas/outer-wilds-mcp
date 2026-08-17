@@ -1,18 +1,81 @@
 <Project>
 
   <!--
-    Path to the game's managed assemblies. Override on the command line if the
-    game lives somewhere else:
-      dotnet build -p:OwManagedDir="E:\Games\Outer Wilds\OuterWilds_Data\Managed"
-  -->
-  <PropertyGroup>
-    <OwManagedDir Condition="'$(OwManagedDir)' == ''">D:\Games\Outer Wilds\OuterWilds_Data\Managed</OwManagedDir>
-    <OwGameDir Condition="'$(OwGameDir)' == ''">D:\Games\Outer Wilds</OwGameDir>
-  </PropertyGroup>
+    The build needs the game's Managed folder to reference Assembly-CSharp.dll.
 
-  <Target Name="CheckManagedDir" BeforeTargets="ResolveAssemblyReferences">
+    It is found automatically: tools/Find-OuterWilds.ps1 reads the install path out of
+    Unity's Player.log, which works for any install including non-store copies, and
+    falls back to the Steam library.
+
+    Override it if detection fails or you have several installs:
+      dotnet build -p:OwManagedDir="E:\Games\Outer Wilds\OuterWilds_Data\Managed"
+
+    OwGameDir is only used by the optional DeployToGame target, and is derived from
+    OwManagedDir unless set.
+
+    NOTE ON ORDERING: the game references are declared inside AddGameReferences below
+    rather than in an ItemGroup in the .csproj. HintPath in a static ItemGroup is
+    resolved during evaluation, which happens before any target runs — so a path
+    discovered by a target would arrive too late. Items added inside a target that runs
+    before ResolveAssemblyReferences are picked up correctly.
+  -->
+
+  <Target Name="DetectGameDir"
+          BeforeTargets="AddGameReferences"
+          Condition="'$(OwManagedDir)' == ''">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)tools\Find-OuterWilds.ps1&quot;"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="DetectedManagedDir" />
+    </Exec>
+
+    <PropertyGroup>
+      <OwManagedDir Condition="'$(DetectedManagedDir)' != ''">$(DetectedManagedDir.Trim())</OwManagedDir>
+    </PropertyGroup>
+
+    <Message Condition="'$(OwManagedDir)' != ''" Importance="high"
+             Text="Found Outer Wilds: $(OwManagedDir)" />
+  </Target>
+
+  <Target Name="AddGameReferences" BeforeTargets="ResolveAssemblyReferences">
+    <PropertyGroup>
+      <OwGameDir Condition="'$(OwGameDir)' == '' and '$(OwManagedDir)' != ''">$([System.IO.Path]::GetFullPath('$(OwManagedDir)\..\..'))</OwGameDir>
+    </PropertyGroup>
+
+    <Error Condition="'$(OwManagedDir)' == ''"
+           Text="Could not find Outer Wilds. Launch the game once so Unity writes Player.log, or build with -p:OwManagedDir=&quot;&lt;install&gt;\OuterWilds_Data\Managed&quot;." />
+
     <Error Condition="!Exists('$(OwManagedDir)\Assembly-CSharp.dll')"
-           Text="Assembly-CSharp.dll not found in '$(OwManagedDir)'. Set OwManagedDir to your Outer Wilds Managed folder." />
+           Text="Assembly-CSharp.dll not found in '$(OwManagedDir)'. Point OwManagedDir at your Outer Wilds Managed folder." />
+
+    <!--
+      Reference the game's own assemblies rather than NuGet Unity packages: this compiles
+      against exactly what is installed, so a signature mismatch is impossible.
+      Private=false — never copy these into the output.
+    -->
+    <ItemGroup>
+      <Reference Include="Assembly-CSharp">
+        <HintPath>$(OwManagedDir)\Assembly-CSharp.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+      <Reference Include="Newtonsoft.Json">
+        <HintPath>$(OwManagedDir)\Newtonsoft.Json.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+      <Reference Include="UnityEngine">
+        <HintPath>$(OwManagedDir)\UnityEngine.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+      <Reference Include="UnityEngine.CoreModule">
+        <HintPath>$(OwManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+      <Reference Include="UnityEngine.PhysicsModule">
+        <HintPath>$(OwManagedDir)\UnityEngine.PhysicsModule.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+    </ItemGroup>
   </Target>
 
 </Project>

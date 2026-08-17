@@ -15,33 +15,8 @@
     <PackageReference Include="BepInEx.Core" Version="5.4.21" />
   </ItemGroup>
 
-  <!--
-    Reference the game's own assemblies rather than NuGet Unity packages: this is
-    compiled against exactly what is installed, so a signature mismatch is impossible.
-    Private=false — never copy these into the output.
-  -->
-  <ItemGroup>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>$(OwManagedDir)\Assembly-CSharp.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(OwManagedDir)\Newtonsoft.Json.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>$(OwManagedDir)\UnityEngine.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(OwManagedDir)\UnityEngine.CoreModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>$(OwManagedDir)\UnityEngine.PhysicsModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
+  <!-- The game's own assemblies are added by AddGameReferences in Directory.Build.props,
+       which has to resolve the install path first. See the ordering note there. -->
 
   <!-- Convenience: dotnet build -p:DeployToGame=true  drops the dll into BepInEx\plugins -->
   <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true'">

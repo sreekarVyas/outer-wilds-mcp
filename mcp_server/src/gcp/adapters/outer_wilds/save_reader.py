@@ -8,13 +8,12 @@ because it is only flushed at loop boundaries and on quit.
 from __future__ import annotations
 
 import json
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-SAVE_ROOT = Path(os.environ["USERPROFILE"]) / "AppData/LocalLow/Mobius Digital/Outer Wilds"
+from gcp import config
 
 
 @dataclass
@@ -69,9 +68,11 @@ class KnowledgeState:
         }
 
 
-def find_profiles(root: Path = SAVE_ROOT) -> list[Path]:
+def find_profiles(root: Path | None = None) -> list[Path]:
     """All save directories, newest first. Covers Steam, Epic, and any other store layout."""
-    if not root.exists():
+    if root is None:
+        root = config.save_root().value
+    if root is None or not root.exists():
         return []
     saves = [p for p in root.glob("*Saves/*/data.owsave") if p.is_file()]
     return sorted(saves, key=lambda p: p.stat().st_mtime, reverse=True)

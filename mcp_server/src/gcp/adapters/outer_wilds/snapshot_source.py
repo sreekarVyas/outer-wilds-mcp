@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import Any
 
-DEFAULT_SNAPSHOT_PATH = Path(
-    os.environ.get("GCP_SNAPSHOT_PATH", r"D:\Games\Outer Wilds\BepInEx\gcp-snapshot.json")
-)
+from gcp import config
 
 # Past this, the game is closed, paused, or the plugin died. The snapshot is written
 # at 10 Hz, so anything older than a couple of seconds means something stopped.
@@ -21,7 +18,8 @@ SUPPORTED_SCHEMA = 1
 
 class SnapshotSource:
     def __init__(self, path: Path | None = None) -> None:
-        self.path = path or DEFAULT_SNAPSHOT_PATH
+        self.resolved = config.snapshot_path(path)
+        self.path = self.resolved.value
 
     # The writer replaces the file atomically, but Windows can still deny a read that
     # lands exactly on the replace. Retrying beats reporting the game as closed.
@@ -35,7 +33,10 @@ class SnapshotSource:
 
         for attempt in range(self.READ_ATTEMPTS):
             if not self.path.exists():
-                return None, [f"no snapshot at {self.path} — is the game running with the plugin?"]
+                return None, [
+                    f"no snapshot at {self.path} (from {self.resolved.source}) — "
+                    "is the game running with the plugin? Run `gcp doctor` for details."
+                ]
 
             try:
                 data = json.loads(self.path.read_text(encoding="utf-8"))
