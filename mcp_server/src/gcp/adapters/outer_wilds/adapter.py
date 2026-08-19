@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from gcp import voice
 from gcp.adapters.base import Sourced
 
 from . import direction
@@ -129,37 +130,70 @@ class OuterWildsAdapter:
             warnings=warnings,
         )
 
-    def get_progression(self) -> Sourced:
+    def get_progression(self, include_internals: bool = False) -> Sourced:
+        """How far along the player is — deliberately vague.
+
+        A percentage is a spoiler in both directions: it reveals the size of the game,
+        and "you are 64% done" flattens a story about discovery into a progress bar.
+        The internal summary is still available for debugging.
+        """
         save = self.saves.get()
         if save is None:
-            return self._unavailable(["no Outer Wilds save file found"])
+            return self._unavailable(["no save file found"])
+
+        if include_internals:
+            data = save.summary()
+        else:
+            data = {
+                "note": (
+                    "Progress is deliberately not reported as a number. Ask about what "
+                    "the player has found instead."
+                ),
+            }
 
         return Sourced(
-            data=save.summary(),
+            data=data,
             source="save_file",
             stale=True,  # always: the save is only written at loop end and on quit
             age_seconds=save.age_seconds,
-            warnings=["save data reflects the last write, not the current moment"],
+            warnings=["saved progress reflects the last write, not this moment"],
         )
 
-    def get_player_known_context(self, spoiler_level: str = "full") -> Sourced:
+    def get_player_known_context(self, include_internals: bool = False) -> Sourced:
         save = self.saves.get()
         if save is None:
             return self._unavailable(["no Outer Wilds save file found"])
 
-        # "full" returns every fact in the game; "player_known" returns only what the
-        # player has discovered. Full is the default by the project owner's choice.
-        facts = list(save.facts) if spoiler_level == "full" else save.revealed_facts
+        if not self.text.available:
+            return Sourced(
+                data={"note": (
+                    "The written notes are not available yet. Start the game and load "
+                    "your save once, and they will be."
+                )},
+                source="save_file",
+                stale=True,
+                age_seconds=save.age_seconds,
+                warnings=self.text.warnings,
+            )
 
+        found = set(save.revealed_facts)
+        unfound = [fid for fid in save.facts if fid not in found]
+
+        # Both halves, kept apart. The assistant needs the second to aim a nudge and
+        # must never quote from it — separating them makes that distinction impossible
+        # to lose, in a way a single mixed list would not.
         data: dict[str, Any] = {
-            "spoiler_level": spoiler_level,
-            "count": len(facts),
+            "found": self.text.group_by_entry(sorted(found)),
+            "not_yet_found": self.text.group_by_entry(unfound),
+            "how_to_use": (
+                "'found' is the player's own log and may be quoted freely. "
+                "'not_yet_found' is for choosing which direction to point them in. "
+                "Never name, quote, or hint at its contents."
+            ),
         }
 
-        if self.text.available:
-            data["entries"] = self.text.group_by_entry(facts)
-        else:
-            data["fact_ids"] = facts
+        if not include_internals:
+            data = voice.strip_internals(data)
 
         return Sourced(
             data=data,
@@ -169,8 +203,20 @@ class OuterWildsAdapter:
             warnings=self.text.warnings,
         )
 
-    def get_current_context(self, spoiler_level: str = "full") -> Sourced:
-        """The composed answer — the tool the assistant should normally call."""
+    def get_current_context(self, include_internals: bool = False) -> Sourced:
+        """The composed answer — the tool the assistant should normally call.
+
+        Two separate concerns, deliberately not conflated:
+
+        **Knowledge** is not withheld. The assistant sees the whole world, including
+        places the player has not found, each marked with `discovered`. Withholding it
+        would leave the assistant unable to tell a real lead from an empty direction.
+
+        **Vocabulary** is enforced here rather than requested. Counts, ids, save flags
+        and raw coordinates are stripped, because an assistant repeats whatever it is
+        given, and "239 of 371 facts" tells the player how large the game is in the
+        vocabulary of a save file. The phrased forms carry the same meaning.
+        """
         snapshot, warnings, stale, age = self._live()
         save = self.saves.get()
 
@@ -178,7 +224,7 @@ class OuterWildsAdapter:
 
         if snapshot is None or not snapshot.get("in_game"):
             data["live"] = False
-            data["note"] = "game not running, or not in a playable scene"
+            data["note"] = "the game is not running, or you are not in the world yet"
         else:
             player = snapshot.get("player") or {}
             loop = snapshot.get("loop") or {}
@@ -197,6 +243,7 @@ class OuterWildsAdapter:
                 data["position_hint"] = location.get("hint")
 
             data["player_state"] = _describe_player(player)
+            data["time_left"] = voice.time_left(loop.get("remaining"))
             data["loop"] = {
                 "count": loop.get("count"),
                 "seconds_remaining": round(loop.get("remaining", 0)),
@@ -207,20 +254,27 @@ class OuterWildsAdapter:
             data["ship_direction"] = ship.get("direction")
 
             # Markers with directions: the answer to "where do I go from here".
+            #
+            # A marker exists for every location in the game, discovered or not. All of
+            # them are reported, because an assistant that cannot see an undiscovered
+            # lead cannot tell a promising direction from an empty one — it can only
+            # recycle notes the player already has.
+            #
+            # `discovered` is what makes that safe: it marks which names may be spoken
+            # aloud. An undiscovered entry is for aiming the nudge, never for naming.
+            known = self._known_entry_ids(save)
             data["nearby"] = [
                 {
                     "name": m.get("name"),
                     "direction": m.get("direction"),
+                    "discovered": m.get("id") in known,
                 }
                 for m in (direction.annotate(e) for e in (snapshot.get("nearby_entries") or []))
                 if m.get("direction")
             ]
 
-        if save is not None:
-            data["progression"] = {
-                "loop_count": save.loop_count,
-                "facts_revealed": len(save.revealed_facts),
-            }
+        if not include_internals:
+            data = voice.strip_internals(data)
 
         return Sourced(
             data=data,
@@ -229,6 +283,23 @@ class OuterWildsAdapter:
             age_seconds=age,
             warnings=warnings,
         )
+
+    def _known_entry_ids(self, save) -> set[str]:
+        """Ship log entries the player has found at least one fact for.
+
+        Entry ids are not in the save, only fact ids — so this maps facts back to their
+        entry through the dump. With no dump available, nothing can be shown to be known,
+        and the safe answer is to show nothing rather than everything.
+        """
+        if save is None or not self.text.available:
+            return set()
+
+        known: set[str] = set()
+        for fact_id in save.revealed_facts:
+            fact = self.text.fact(fact_id)
+            if fact is not None:
+                known.add(fact.entry_id)
+        return known
 
     def get_connection_status(self) -> Sourced:
         snapshot, warnings, stale, age = self._live()
