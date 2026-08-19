@@ -17,3 +17,6 @@ venv/
 # Runtime output
 snapshot.json
 *.log
+
+# Tests
+tests/
