@@ -20,3 +20,6 @@ snapshot.json
 
 # Tests
 tests/
+
+# Agents
+.claude/
